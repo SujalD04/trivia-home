@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  client:
+    build: ./frontend
+    container_name: quiz-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+  server:
+    build: ./backend
+    container_name: quiz-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=${MONGO_URI} # from your .env file
+    env_file:
+      - .env
