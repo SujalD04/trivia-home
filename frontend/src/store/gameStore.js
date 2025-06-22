@@ -4,8 +4,8 @@ import { io } from 'socket.io-client';
 import { useUserStore } from '../store/UserStore';
 
 // Define API and Socket server URLs
-const API_BASE_URL = 'http://localhost:5000/api';
-const SOCKET_SERVER_URL = 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL;
 
 // Initial state for the game store
 const initialState = {

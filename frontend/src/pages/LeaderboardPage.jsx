@@ -7,6 +7,7 @@ const LeaderboardPage = () => {
   const [topPlayers, setTopPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     async function fetchData() {
@@ -16,7 +17,7 @@ const LeaderboardPage = () => {
         // Fetch personal stats
         let personalData = null;
         if (userId) { // Only fetch if userId is available
-          const personalRes = await fetch(`http://localhost:5000/api/stats/${userId}`);
+          const personalRes = await fetch(`${API_BASE_URL}/stats/${userId}`);
           if (!personalRes.ok) {
             console.warn(`Failed to fetch personal stats for ${userId}: ${personalRes.status}`);
           } else {
@@ -26,7 +27,7 @@ const LeaderboardPage = () => {
         setPersonalStats(personalData);
 
         // Fetch top players
-        const topRes = await fetch(`http://localhost:5000/api/stats/global/top`);
+        const topRes = await fetch(`${API_BASE_URL}/stats/global/top`);
         if (!topRes.ok) {
           throw new Error(`HTTP error! status: ${topRes.status} for global top players`);
         }
