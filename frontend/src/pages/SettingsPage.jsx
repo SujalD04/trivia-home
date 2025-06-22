@@ -110,7 +110,7 @@ const SettingsPage = () => {
     setError(null); // Clear any previous errors
 
     try {
-      const response = await fetch(`http://localhost:5000/api/settings/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/settings/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
