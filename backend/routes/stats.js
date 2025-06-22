@@ -20,7 +20,7 @@ router.get('/global/top', async (req, res) => {
   try {
     const topUsers = await UserStats.find({})
       .sort({ totalWins: -1 }) // or sort by totalGames or totalQuestions
-      .limit(10);
+      .limit(25);
 
     res.json(topUsers);
   } catch (err) {
