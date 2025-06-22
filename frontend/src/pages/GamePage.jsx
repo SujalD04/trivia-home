@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import LiveChat from '../components/LiveChat';
+import Loader from '../components/KnowledgeLoader';
 
 // Helper function to decode HTML entities like &eacute;
 function decodeHtml(html) {
@@ -152,12 +153,7 @@ function GamePage() {
     // Loading state for initial page load or reconnecting
     if (isLoading && !roomId) {
         return (
-            <div className="min-h-screen w-full flex justify-center items-center bg-gray-900 text-white font-inter">
-                <div className="flex items-center space-x-3 text-2xl text-blue-400">
-                    <span className="animate-spin text-4xl">⚙️</span>
-                    <p>Loading game...</p>
-                </div>
-            </div>
+            <Loader />
         );
     }
 
@@ -427,7 +423,7 @@ function GamePage() {
                 {/* Right Side: Scoreboard */}
                 <div className="w-full md:w-1/3 flex flex-col">
                   <LiveChat />
-                  <div className="bg-gray-700 p-6 rounded-xl shadow-neo-inset border-2 border-gray-600 flex-1 pt-2">
+                  <div className="bg-gray-700 p-6 rounded-xl shadow-neo-inset border-2 border-gray-600 flex-1 pt-2 mt-8">
                         <h2 className="text-2xl font-bold text-purple-400 mb-4 text-center">Live Scoreboard</h2>
                         {/* New div for the scrollable list of participants */}
                         <div className="h-80 overflow-y-auto pr-2"> {/* Added h-80 for fixed height, overflow-y-auto for scroll, and pr-2 for scrollbar spacing */}

@@ -6,6 +6,8 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
+
+
 // Import your models
 const User = require('./models/User');
 const Room = require('./models/Room');
@@ -13,6 +15,7 @@ const Game = require('./models/Game'); // Assuming you have a Game model for his
 
 // Import routes
 const roomRoutes = require('./routes/roomRoutes');
+const statsRoutes = require('./routes/stats');
 
 // Import utilities
 const { fetchTriviaQuestions, fetchTriviaCategories } = require('./utils/triviaApi');
@@ -32,6 +35,8 @@ const MONGO_URI = process.env.MONGO_URI;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+app.use('/api/stats', statsRoutes);
 
 // --- Database Connection ---
 mongoose.connect(MONGO_URI)
@@ -110,7 +115,9 @@ io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
     // --- Lobby Management Events ---
-    socket.on('join_room', async ({ roomId, username, avatar }) => {
+    socket.on('join_room', async ({ roomId, username, avatar, userId }) => {
+    console.log(`[join_room] Received userId: ${userId}`);
+
     if (!roomId || !username || !avatar) {
         console.warn(`Invalid join_room attempt by ${socket.id}. Missing data.`);
         socket.emit('join_room_error', { message: 'Missing room ID, username, or avatar.' });
@@ -201,7 +208,8 @@ io.on('connection', (socket) => {
         avatar,
         score: 0,
         isHost: isHostForThisSession || (socket.id === roomState.currentHostSocketId),
-        answered: false
+        answered: false,
+        userId
     });
     roomState.usernamesInRoom.add(usernameKey);
     socket.join(roomId);
@@ -583,7 +591,7 @@ io.on('connection', (socket) => {
     });
 
     // --- Answer Submission Event ---
-    socket.on('submit_answer', ({ roomId, username, answer }) => {
+    socket.on('submit_answer', async ({ roomId, username, answer, userId }) => {
         roomId = roomId.toUpperCase();
         const roomState = activeRooms.get(roomId);
         const player = roomState?.players.get(socket.id);
@@ -610,6 +618,7 @@ io.on('connection', (socket) => {
         let isCorrect = submittedAnswer === correctAnswer;
         let pointsEarned = 0;
         let isFastest = false;
+
         if (isCorrect) {
             pointsEarned = POINTS_FOR_CORRECT_ANSWER;
 
@@ -621,41 +630,70 @@ io.on('connection', (socket) => {
             }
 
             player.score += pointsEarned;
-
-            // ✅ NEW: Add coins
             player.coins = (player.coins || 0) + pointsEarned;
-            console.log(`${username} submitted: "${answer}", Correct: YES. Score: ${player.score}, Coins: ${player.coins}`);
 
             socket.emit('answer_feedback', {
                 success: true,
                 message: 'Correct answer!',
                 correctAnswer: currentQuestion.correctAnswer
             });
+
             io.to(roomId).emit('score_update', {
                 username,
                 score: player.score,
                 pointsEarned,
                 isCorrect: true,
                 isFastest,
-                coins: player.coins // ✅ Include coins
+                coins: player.coins
             });
         } else {
-            console.log(`${username} submitted: "${answer}", Correct: NO. Score: ${player.score}`);
             socket.emit('answer_feedback', {
                 success: false,
                 message: 'Incorrect answer.',
                 correctAnswer: currentQuestion.correctAnswer
             });
+
             io.to(roomId).emit('score_update', {
                 username,
                 score: player.score,
                 pointsEarned: 0,
                 isCorrect: false,
                 isFastest: false,
-                coins: player.coins || 0 // Still send current coins
+                coins: player.coins || 0
             });
         }
+
+        // ✅ Save stats to DB using userId
+        if (userId) {
+            try {
+                const UserStats = await import('./models/UserStats.js').then(m => m.default); // ESM-style
+                let user = await UserStats.findOne({ userId });
+                if (!user) {
+                    user = await UserStats.create({ userId });
+                }
+
+                user.totalQuestions += 1;
+                if (isCorrect) {
+                    user.totalWins += 1;
+                } else {
+                    user.totalLosses += 1;
+                }
+
+                const now = Date.now();
+                const startTime = player.questionStartTime || now; // fallback in case
+                const answerTime = (now - startTime) / 1000; // in seconds
+
+                if (!user.fastestAnswerTime || answerTime < user.fastestAnswerTime) {
+                    user.fastestAnswerTime = answerTime;
+                }
+
+                await user.save();
+            } catch (err) {
+                console.error("Error updating user stats:", err);
+            }
+        }
     });
+
 
 
     // --- Helper function to send next question ---
@@ -677,6 +715,7 @@ io.on('connection', (socket) => {
         // Reset 'answered' status for all players for the new question
         roomState.players.forEach(player => {
             player.answered = false;
+            player.questionStartTime = Date.now();
         });
         // Check if there are more questions
         if (roomState.currentQuestionIndex < roomState.questions.length) {
@@ -748,6 +787,23 @@ io.on('connection', (socket) => {
                     )
                 )
             );
+            await Promise.all(
+                Array.from(roomState.players.entries()).map(async ([socketId, player]) => {
+                    if (!player.userId) return;
+
+                    try {
+                    const UserStats = await import('./models/UserStats.js').then(m => m.default);
+                    const user = await UserStats.findOne({ userId: player.userId });
+                    if (user) {
+                        user.totalGames += 1;
+                        await user.save();
+                    }
+                    } catch (err) {
+                    console.error(`Error updating totalGames for ${player.userId}:`, err);
+                    }
+                })
+            );
+
             console.log(`User coin balances updated in DB for room ${roomId}.`);
 
             // Save game results to DB

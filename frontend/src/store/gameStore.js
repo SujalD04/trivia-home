@@ -1,6 +1,7 @@
 // frontend/src/store/gameStore.js
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
+import { useUserStore } from '../store/UserStore';
 
 // Define API and Socket server URLs
 const API_BASE_URL = 'http://localhost:5000/api';
@@ -54,6 +55,8 @@ const initialState = {
     error: null, // { type: 'join'|'game'|'room'|'connect'|'settings', message: '...' }
     notification: null, // { type: 'success'|'error'|'info'|'warning', message: '...' }
 };
+
+const { userId } = useUserStore.getState();
 
 let rejoinEmitted = false;
 
@@ -173,6 +176,7 @@ export const useGameStore = create((set, get) => ({
                         roomId: storedRoomId,
                         username: storedUsername,
                         avatar: storedAvatar,
+                        userId: localStorage.getItem("quizUserId"),
                         rejoin: true
                     });
                 }, 400);
@@ -507,6 +511,7 @@ export const useGameStore = create((set, get) => ({
                     roomId: apiData.roomId,
                     username: usernameInput,
                     avatar: avatarInput,
+                    userId: useUserStore.getState().userId,
                     rejoin: false // This is an initial join, not a rejoin
                 });
                 // Status remains 'connecting' until 'update_lobby' or 'room_data' confirms
@@ -572,6 +577,7 @@ export const useGameStore = create((set, get) => ({
                     roomId: apiData.roomId,
                     username: usernameInput,
                     avatar: avatarInput,
+                    userId,
                     rejoin: false // This is an initial join, not a rejoin
                 });
                 // Status remains 'connecting' until 'update_lobby' or 'room_data' confirms
@@ -651,21 +657,26 @@ export const useGameStore = create((set, get) => ({
 
     submitAnswer: (answer) => {
         const { socket, roomId, myUsername, answeredThisQuestion, currentQuestion, questionIndex } = get();
+        const { userId } = useUserStore.getState(); // 🔥 Grab the uuid here
+
         if (answeredThisQuestion || !currentQuestion) {
-            get().setNotification({ type: 'warning', message: 'Already answered or no question active.' });
-            return;
+        get().setNotification({ type: 'warning', message: 'Already answered or no question active.' });
+        return;
         }
+
         if (socket && socket.connected && roomId && myUsername && answer) {
-            socket.emit('submit_answer', {
-                roomId,
-                username: myUsername,
-                answer: answer,
-                questionIndex: questionIndex // Include question index for backend validation
-            });
-            set({ mySubmittedAnswer: answer, answeredThisQuestion: true }); // Mark as answered locally
-            get().setNotification({ type: 'info', message: 'Answer submitted!' });
+        socket.emit('submit_answer', {
+            roomId,
+            username: myUsername,
+            answer,
+            questionIndex,
+            userId, // ✅ send uuid to backend
+        });
+
+        set({ mySubmittedAnswer: answer, answeredThisQuestion: true });
+        get().setNotification({ type: 'info', message: 'Answer submitted!' });
         } else {
-            get().setNotification({ type: 'error', message: 'Could not submit answer: Game not active or data missing.' });
+        get().setNotification({ type: 'error', message: 'Could not submit answer: Game not active or data missing.' });
         }
     },
 

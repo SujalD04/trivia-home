@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore.js'; // Ensure .js extension for explicit resolution
 import LiveChat from '../components/LiveChat.jsx';
+import Loader from '../components/KnowledgeLoader.jsx';
 
 // Helper to generate DiceBear avatar URL (consistent with HomePage)
 const getDiceBearAvatarUrl = (style, seed) => {
@@ -12,6 +13,10 @@ function LobbyPage() {
     const { roomId: urlRoomId } = useParams(); // Get room ID from URL
     const navigate = useNavigate();
     const [showChatForHost, setShowChatForHost] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const { roomPassword } = useGameStore();
+
 
     const participants = useGameStore(state => state.participants);
     // Access state and actions from Zustand store
@@ -272,12 +277,7 @@ function LobbyPage() {
     // Initial loading or if somehow page loaded without a roomId (should redirect)
     if (isLoading && !roomId) {
         return (
-            <div className="min-h-screen w-full flex justify-center items-center bg-gray-900 text-white font-inter">
-                <div className="flex items-center space-x-3 text-2xl text-blue-400">
-                    <span className="animate-spin text-4xl">⚙️</span>
-                    <p>Connecting to room...</p>
-                </div>
-            </div>
+            <Loader />
         );
     }
 
@@ -447,10 +447,42 @@ function LobbyPage() {
 
             {/* --- Main Content Container --- */}
             <div className="relative z-10 bg-gray-800 bg-opacity-90 backdrop-filter backdrop-blur-sm rounded-2xl shadow-neo-brutalism p-6 sm:p-8 md:p-10 lg:p-12 w-full max-w-7xl mx-auto animate-fade-in border-4 border-gray-700">
-
                 <h1 className="text-4xl sm:text-5xl font-bold text-center text-blue-400 mb-6">
                     Room: {roomId}
                 </h1>
+                {roomPassword && (
+                <div className="max-w-sm mx-auto mt-4 bg-gray-800 text-blue-200 border border-blue-500 shadow-md rounded-xl px-4 py-3 relative mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-blue-400">Room Password</span>
+                    <button
+                        onClick={() => setShowPassword(prev => !prev)}
+                        className="text-xs text-blue-400 hover:text-blue-300 hover:underline transition"
+                    >
+                        {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                    <code className="text-sm text-blue-300 tracking-wide">
+                        {showPassword ? roomPassword : '••••••'}
+                    </code>
+                    <button
+                        onClick={() => {
+                        navigator.clipboard.writeText(roomPassword);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className={`ml-3 px-3 py-1 text-xs rounded transition 
+                        ${copied 
+                            ? 'bg-green-600 text-white' 
+                            : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                    >
+                        {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                    </div>
+                </div>
+                )}
+
+
                 <p className="text-lg sm:text-xl text-center text-gray-300 mb-8 font-light">
                     Welcome, <span className="font-semibold text-blue-300">{myUsername}</span>!
                     You are currently the <span className="font-semibold text-blue-300">{isHost ? 'Host' : 'Player'}</span>.
