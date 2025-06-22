@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useUserStore } from '../store/UserStore.js'; // Assuming this provides userId - Changed to .jsx
-import { useGameStore } from '../store/gameStore.js'; // For notifications/errors if needed - Changed to .jsx
+import { useUserStore } from '../store/UserStore.js'; // Corrected to .js extension
+import { useGameStore } from '../store/gameStore.js'; // Corrected to .js extension
+import Loader from '../components/KnowledgeLoader.jsx';
 
 const SettingsPage = () => {
   const { userId } = useUserStore();
@@ -12,6 +13,7 @@ const SettingsPage = () => {
     notificationsEnabled: true,
     theme: 'dark', // Default theme
     fastMode: false,
+    preferredLanguage: 'en', // Added preferredLanguage with default 'en'
   });
 
   const [initialSettings, setInitialSettings] = useState(null); // To track if changes have been made
@@ -39,12 +41,14 @@ const SettingsPage = () => {
               notificationsEnabled: true,
               theme: 'dark',
               fastMode: false,
+              preferredLanguage: 'en', // Set default for new users
             });
             setInitialSettings({ // Set initial settings to defaults
               soundEnabled: true,
               notificationsEnabled: true,
               theme: 'dark',
               fastMode: false,
+              preferredLanguage: 'en', // Set default for new users
             });
             setNotification({ message: "Default settings loaded.", type: "info" });
           } else {
@@ -52,8 +56,21 @@ const SettingsPage = () => {
           }
         } else {
           const data = await response.json();
-          setSettings(data);
-          setInitialSettings(data); // Store initial fetched settings
+          // Ensure all settings fields are present, even if backend sends less
+          setSettings({
+            soundEnabled: data.soundEnabled ?? true,
+            notificationsEnabled: data.notificationsEnabled ?? true,
+            theme: data.theme ?? 'dark',
+            fastMode: data.fastMode ?? false,
+            preferredLanguage: data.preferredLanguage ?? 'en', // Handle new field
+          });
+          setInitialSettings({ // Store initial fetched settings, ensuring all fields
+            soundEnabled: data.soundEnabled ?? true,
+            notificationsEnabled: data.notificationsEnabled ?? true,
+            theme: data.theme ?? 'dark',
+            fastMode: data.fastMode ?? false,
+            preferredLanguage: data.preferredLanguage ?? 'en',
+          });
         }
       } catch (err) {
         console.error("Error fetching settings:", err);
@@ -65,6 +82,7 @@ const SettingsPage = () => {
 
     fetchSettings();
   }, [userId, setNotification, setError]); // Depend on userId to re-fetch if it changes
+
 
   // Check if settings have changed from their initial state
   const hasChanges = initialSettings && JSON.stringify(settings) !== JSON.stringify(initialSettings);
@@ -120,12 +138,7 @@ const SettingsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 to-black text-white flex items-center justify-center p-4">
-        <div className="flex flex-col items-center justify-center bg-gray-800 bg-opacity-90 rounded-2xl shadow-lg p-8 sm:p-10 border-4 border-purple-700 animate-fade-in">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500"></div>
-          <p className="mt-4 text-xl font-semibold text-purple-300">Loading your preferences...</p>
-        </div>
-      </div>
+      <Loader />
     );
   }
 
@@ -295,10 +308,31 @@ const SettingsPage = () => {
             />
           </SettingCard>
 
+          {/* Preferred Language Selector - NEW */}
+          <SettingCard
+            title="Preferred Language"
+            description="Select your preferred language for the application interface."
+            icon="🌐"
+            delay="0.5s"
+          >
+            <select
+              name="preferredLanguage"
+              value={settings.preferredLanguage}
+              onChange={handleChange}
+              className="mt-2 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-neo-inset"
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              {/* Add more language options as needed */}
+            </select>
+          </SettingCard>
+
         </div>
 
         {/* --- Save Button --- */}
-        <div className="flex justify-center mt-8 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+        <div className="flex justify-center mt-8 animate-fade-in" style={{ animationDelay: '0.6s' }}>
           <button
             onClick={handleSaveSettings}
             disabled={saving || !hasChanges}
@@ -315,12 +349,12 @@ const SettingsPage = () => {
 
         {/* --- Save Status Feedback --- */}
         {saveStatus === 'saved' && (
-          <p className="text-center text-green-400 mt-4 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+          <p className="text-center text-green-400 mt-4 animate-fade-in" style={{ animationDelay: '0.7s' }}>
             Settings saved successfully!
           </p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-center text-red-400 mt-4 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+          <p className="text-center text-red-400 mt-4 animate-fade-in" style={{ animationDelay: '0.7s' }}>
             Failed to save settings.
           </p>
         )}

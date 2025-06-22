@@ -16,6 +16,7 @@ const Game = require('./models/Game'); // Assuming you have a Game model for his
 // Import routes
 const roomRoutes = require('./routes/roomRoutes');
 const statsRoutes = require('./routes/stats');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 // Import utilities
 const { fetchTriviaQuestions, fetchTriviaCategories } = require('./utils/triviaApi');
@@ -37,6 +38,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/stats', statsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // --- Database Connection ---
 mongoose.connect(MONGO_URI)
