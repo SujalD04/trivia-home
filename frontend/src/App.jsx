@@ -18,7 +18,7 @@ import LeaderboardPage from './pages/LeaderboardPage.jsx'; // Added .jsx extensi
 
 import KnowledgeLoader from './components/KnowledgeLoader.jsx'; // Import the new loader component - Added .jsx extension
 
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   const { connectSocket, isConnected, notification, error, isLoading } = useGameStore();
