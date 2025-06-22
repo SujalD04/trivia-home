@@ -671,6 +671,10 @@ function LobbyPage() {
                         {isLeavingRoom ? <span className="animate-spin mr-3 text-2xl">🚪</span> : 'Leave Room'}
                     </button>
                 </div>
+                {/* --- Footer / Credits --- */}
+                <p className="text-center text-gray-500 text-sm mt-12 animate-fade-in animation-delay-1000">
+                &copy; {new Date().getFullYear()} Trivia Home. All rights reserved.
+                </p>
             </div>
 
             {/* Confirmation Modal Render */}

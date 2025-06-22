@@ -360,7 +360,7 @@ const SettingsPage = () => {
 
         {/* --- Footer --- */}
         <p className="text-center text-gray-500 text-sm mt-12">
-          &copy; {new Date().getFullYear()} Trivia Challenge. All rights reserved.
+          &copy; {new Date().getFullYear()} Trivia Home. All rights reserved.
         </p>
 
       </div>
