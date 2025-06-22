@@ -99,9 +99,6 @@ function LobbyPage() {
         
         setSelectedDifficulty(gameSettings.difficulty || 'any');// Update the local state for the dropdown
 
-        console.log("Game settings from store on update:", gameSettings);
-        console.log("Setting selectedCategoryId to:", currentSelectedId);
-        console.log("Setting selectedDifficulty to:", gameSettings.difficulty || 'any');
     }, [gameSettings]); // Re-run when gameSettings object changes
 
             // Effect to fetch trivia categories using the store action 
@@ -110,14 +107,12 @@ function LobbyPage() {
         if (availableCategories && availableCategories.length === 0) { 
             fetchCategories(); // Call the action from useGameStore 
         }
-        console.log("Current availableCategories in LobbyPage:", availableCategories); 
     }, [fetchCategories, availableCategories]);
 
     // Effect to handle initial connection and redirection logic
     useEffect(() => {
         // If socket is not connected, try to connect it.
         if (!socket || !socket.connected) {
-            console.log("LobbyPage: Socket not connected, attempting to connect.");
             connectSocket();
         }
 
@@ -130,7 +125,6 @@ function LobbyPage() {
 
         // If game starts, redirect to a game-specific page
         if (roomStatus === 'playing') {
-            console.log("LobbyPage: roomStatus is 'playing', navigating to game page.");
             setNotification({ type: 'info', message: 'Game is starting!' });
             navigate(`/game/${urlRoomId || roomId}`); // Use URL roomId if available, fallback to store
             return;
@@ -138,7 +132,6 @@ function LobbyPage() {
 
         // Clear any room-specific errors if the room is now valid
         if (error && error.type === 'room' && roomId) {
-            console.log("LobbyPage: Clearing room-specific error.");
             clearError();
         }
 
@@ -155,13 +148,11 @@ function LobbyPage() {
 
     const handleCategoryChange = (e) => {
      setSelectedCategoryId(e.target.value); 
-     console.log("Category selected:", e.target.value);
     };
 
     // --- NEW: Handle difficulty change ---
     const handleDifficultyChange = (e) => {
         setSelectedDifficulty(e.target.value);
-        console.log("Difficulty selected:", e.target.value);
     };
 
 

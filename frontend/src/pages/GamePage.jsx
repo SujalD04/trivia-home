@@ -82,20 +82,17 @@ function GamePage() {
     useEffect(() => {
         // Attempt to connect socket if not connected
         if (!socket || !socket.connected) {
-            console.log("GamePage: Socket not connected, attempting to connect.");
             connectSocket(); // This will attempt to re-join room if data exists in store
             return;
         }
 
         // Redirect logic based on room status
         if (roomStatus === 'waiting' && roomId === urlRoomId) {
-            console.log("GamePage: Room status is 'waiting', navigating to lobby.");
             navigate(`/room/${roomId}`);
             return;
         }
         // If no room ID or room ID mismatch, or not in 'playing'/'finished' state, go home
         if (!roomId || roomId !== urlRoomId || !['playing', 'finished', 'loading_questions'].includes(roomStatus)) {
-            console.log("GamePage: Invalid room state or ID mismatch, navigating to home.");
             // Removed notification here
             navigate('/');
             return;
@@ -103,7 +100,6 @@ function GamePage() {
 
         // Clear global error if present and context is valid
         if (error) {
-            console.log("GamePage: Clearing global error.");
             clearError();
         }
 

@@ -16,15 +16,12 @@ router.get('/:userId', async (req, res) => {
 
     if (!settings) {
       // If no settings document is found for the given userId
-      console.log(`Settings not found for user: ${userId}`);
       return res.status(404).json({ message: 'Settings not found for this user.' });
     }
 
     // If settings are found, send them as JSON
     res.json(settings);
   } catch (error) {
-    // Log the error for debugging purposes
-    console.error(`Error fetching settings for user ${req.params.userId}:`, error.message);
     // Send a 500 Internal Server Error response
     res.status(500).json({ message: 'Server error while fetching settings.' });
   }
@@ -55,8 +52,6 @@ router.put('/:userId', async (req, res) => {
     // Send the updated (or newly created) settings as JSON
     res.json(updatedSettings);
   } catch (error) {
-    // Log the error for debugging purposes
-    console.error(`Error updating settings for user ${req.params.userId}:`, error.message);
     // Send a 500 Internal Server Error response
     res.status(500).json({ message: 'Server error while updating settings.' });
   }

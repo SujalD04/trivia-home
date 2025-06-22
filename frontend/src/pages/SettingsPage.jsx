@@ -35,8 +35,6 @@ const SettingsPage = () => {
         const response = await fetch(`${API_BASE_URL}/settings/${userId}`);
         if (!response.ok) {
           if (response.status === 404) {
-            // If settings not found for user, use defaults and inform user
-            console.log("No settings found for this user, using default settings.");
             setSettings({
               soundEnabled: true,
               notificationsEnabled: true,

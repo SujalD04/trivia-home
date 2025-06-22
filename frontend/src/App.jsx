@@ -18,6 +18,8 @@ import LeaderboardPage from './pages/LeaderboardPage.jsx'; // Added .jsx extensi
 
 import KnowledgeLoader from './components/KnowledgeLoader.jsx'; // Import the new loader component - Added .jsx extension
 
+import { Analytics } from "@vercel/analytics/next"
+
 function App() {
   const { connectSocket, isConnected, notification, error, isLoading } = useGameStore();
 
@@ -53,6 +55,7 @@ function App() {
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </div>
+      <Analytics/>
     </Router>
   );
 }

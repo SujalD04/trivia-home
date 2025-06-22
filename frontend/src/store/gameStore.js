@@ -71,7 +71,6 @@ export const useGameStore = create((set, get) => ({
         try {
             // This URL must point to your backend's categories endpoint
             const response = await fetch(`${API_BASE_URL}/categories`);
-            console.log('Fetching categories from:', `${API_BASE_URL}/categories`);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -80,15 +79,11 @@ export const useGameStore = create((set, get) => ({
 
             // Verify that the data is an array
             if (Array.isArray(data)) {
-                console.log('Categories fetched successfully:', data);
                 set({ availableCategories: data, isLoading: false });
             } else {
-                // Log the unexpected data for debugging
-                console.error("Received unexpected category data format:", data);
                 throw new Error('Invalid category data format received from backend.');
             }
         } catch (err) {
-            console.error("Error fetching categories:", err);
             set({
                 error: {
                     type: 'categories', // A specific error type for categories
@@ -125,7 +120,6 @@ export const useGameStore = create((set, get) => ({
         const { socket } = get();
         // If socket is already connected, just ensure loading is off and potentially re-emit join
         if (socket && socket.connected) {
-            console.log('Socket already connected, re-using existing connection.');
             set({ isLoading: false }); // Ensure loading is off if already connected
 
             const currentRoomId = get().roomId || initialRoomId || localStorage.getItem('roomId');
@@ -133,7 +127,6 @@ export const useGameStore = create((set, get) => ({
             const currentAvatar = get().myAvatar; // Get from state, assuming it's set on initial join
 
             if (currentRoomId && currentUsername) {
-                console.log(`Socket already connected: Attempting to re-emit join_room for ${currentRoomId} as ${currentUsername}`);
                 socket.emit('join_room', {
                     roomId: currentRoomId,
                     username: currentUsername,
@@ -159,7 +152,6 @@ export const useGameStore = create((set, get) => ({
             if (rejoinEmitted) return;
             rejoinEmitted = true;
 
-            console.log('Socket.IO connected:', newSocket.id);
             set({ socket: newSocket, isConnected: true, socketId: newSocket.id, isLoading: false });
             get().setNotification({ type: 'success', message: 'Connected to game server!' });
             localStorage.setItem('socketId', newSocket.id);
@@ -169,7 +161,6 @@ export const useGameStore = create((set, get) => ({
             const storedAvatar = JSON.parse(localStorage.getItem('myAvatar') || 'null') || initialState.myAvatar;
 
             if (storedRoomId && storedUsername) {
-                console.log(`Re-emitting join_room for ${storedRoomId} as ${storedUsername}`);
                 set({ isLoading: true, roomStatus: 'connecting', notification: { type: 'info', message: 'Rejoining room...' } });
                 setTimeout(() => {
                     newSocket.emit('join_room', {
@@ -186,8 +177,6 @@ export const useGameStore = create((set, get) => ({
         newSocket.on('disconnect', (reason) => {
             rejoinEmitted = false;
                 set({ isConnected: false });
-                console.log('Socket.IO disconnected.');
-            console.log('Socket.IO disconnected. Reason:', reason);
 
             // Clear any active timer
             if (get().currentQuestionTimer) {
@@ -230,7 +219,6 @@ export const useGameStore = create((set, get) => ({
         // 'room_data' is a new event (you might need to implement this on backend)
         // It provides the complete state of the room upon initial join or rejoin
         newSocket.on('room_data', (data) => {
-            console.log('Room Data Received:', data);
             const myId = get().socketId;
             const myPlayer = data.players.find(p => p.socketId === myId); // Use 'players' if that's what backend sends
             set({
@@ -286,7 +274,6 @@ export const useGameStore = create((set, get) => ({
             localStorage.removeItem('socketId');
         });
         newSocket.on('update_lobby', (data) => {
-            console.log('Lobby Update:', data);
             const myId = get().socketId;
             const myPlayer = data.participants.find(p => p.socketId === myId);
             set((state) => ({
@@ -313,7 +300,6 @@ export const useGameStore = create((set, get) => ({
             }
         });
         newSocket.on('game_settings_updated', (data) => {
-            console.log('Game settings updated:', data.settings);
             set({
                 gameSettings: {
                     ...data.settings, // Spread existing settings
@@ -329,7 +315,6 @@ export const useGameStore = create((set, get) => ({
             get().setNotification({ type: 'error', message: data.message });
         });
         newSocket.on('game_starting', (data) => {
-            console.log('Game starting:', data.roomId, 'Players:', data.players);
             // Ensure any previous question timer is cleared
             if (get().currentQuestionTimer) {
                 clearInterval(get().currentQuestionTimer);
@@ -353,7 +338,6 @@ export const useGameStore = create((set, get) => ({
         });
         // FIXED: The `send_question` event handler
         newSocket.on('send_question', (data) => {
-            console.log('Received Question:', data);
 
             // Clear previous client-side timer if it exists
             if (get().currentQuestionTimer) {
@@ -373,7 +357,6 @@ export const useGameStore = create((set, get) => ({
                 isLoading: false, // Question data has arrived, loading is done!
                 notification: null, // Clear any old notifications for a fresh question display
             });
-            console.log(`Store: Setting question ${data.questionIndex + 1}. Time limit: ${get().timeRemaining}s`);
 
             // Start client-side timer for the new question
             let countdown = get().timeRemaining; // Start countdown from the set timeRemaining
@@ -384,19 +367,16 @@ export const useGameStore = create((set, get) => ({
                 } else {
                     clearInterval(newTimerIntervalId);
                     set({ currentQuestionTimer: null, timeRemaining: 0 }); // Ensure timeRemaining is 0 after countdown
-                    console.log("Client-side timer ended for current question.");
                 }
             }, 1000);
 
             set({ currentQuestionTimer: newTimerIntervalId }); // Store the new interval ID
         });
         newSocket.on('answer_feedback', (data) => {
-            console.log('Answer Feedback:', data);
             get().setNotification({ type: data.success ? 'success' : 'error', message: data.message });
             // GamePage local state handles selectedOption and correctAnswer based on this.
         });
         newSocket.on('score_update', (data) => {
-            console.log('Score Update:', data);
             if (data.coins !== undefined) {
                 set({ myCoins: data.coins });
             }
@@ -410,7 +390,6 @@ export const useGameStore = create((set, get) => ({
             // Decided to let GamePage manage individual score feedback for less noisy notifications
         });
         newSocket.on('time_up', (data) => {
-            console.log('Time Up:', data);
             // Stop client-side timer when server sends time_up (authoritative)
             if (get().currentQuestionTimer) {
                 clearInterval(get().currentQuestionTimer);
@@ -421,7 +400,6 @@ export const useGameStore = create((set, get) => ({
             // resetGameRoundState will be called by GamePage after a delay to clear local states
         });
         newSocket.on('game_end', (data) => {
-            console.log('Game Ended:', data);
             // Stop any lingering client-side timer
             if (get().currentQuestionTimer) {
                 clearInterval(get().currentQuestionTimer);
@@ -457,7 +435,6 @@ export const useGameStore = create((set, get) => ({
             get().setNotification({ type: 'error', message: data.message });
         });
         newSocket.on('room_deleted', (data) => {
-            console.log('Room Deleted:', data.roomId, data.message);
             get().setNotification({ type: 'error', message: `Room ${data.roomId} was deleted: ${data.message}.` });
             // Disconnect socket and reset to initial state, like `leaveRoom`
             const { socket: currentSocket } = get();
@@ -506,7 +483,6 @@ export const useGameStore = create((set, get) => ({
             // API join successful, now emit socket event
             const { socket } = get();
             if (socket && socket.connected) {
-                console.log(`API success, emitting join_room for socket ${get().socketId}`);
                 socket.emit('join_room', {
                     roomId: apiData.roomId,
                     username: usernameInput,
@@ -572,7 +548,6 @@ export const useGameStore = create((set, get) => ({
             // API create successful, now emit socket event
             const { socket } = get();
             if (socket && socket.connected) {
-                console.log(`API success, emitting join_room for socket ${get().socketId}`);
                 socket.emit('join_room', {
                     roomId: apiData.roomId,
                     username: usernameInput,
@@ -608,7 +583,6 @@ export const useGameStore = create((set, get) => ({
     leaveRoom: () => {
         const { socket, currentQuestionTimer } = get();
         if (socket && socket.connected) {
-            console.log(`Attempting to disconnect socket ${get().socketId} and leave room ${get().roomId}`);
             socket.disconnect(); // This will trigger the 'disconnect' event on the backend
         }
         // Clear any active timer
@@ -714,6 +688,5 @@ export const useGameStore = create((set, get) => ({
             answeredThisQuestion: false, // Allow new submission
             // questionIndex: -1, // NOT CLEARED HERE
         });
-        console.log("Game round state reset for client-side interaction.");
     },
 }));

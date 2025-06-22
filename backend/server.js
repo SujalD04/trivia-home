@@ -88,7 +88,7 @@ app.get('/api/categories', async (req, res) => {
         const categories = await fetchTriviaCategories();
         res.json(categories);
     } catch (error) {
-        console.error('Error in /api/categories endpoint:', error);
+        console.error('Error in endpoint:', error);
         res.status(500).json({ message: 'Failed to fetch categories from trivia API', detail: error.message });
     }
 });
@@ -105,7 +105,7 @@ app.get('/api/questions', async (req, res) => {
         });
         res.json(questions);
     } catch (error) {
-        console.error('Error in /api/questions endpoint:', error);
+        console.error('Error in endpoint:', error);
         res.status(500).json({ message: 'Failed to fetch questions from trivia API', detail: error.message });
     }
 });
@@ -114,14 +114,12 @@ const recentDisconnects = new Map(); // username.toLowerCase() → timestamp
 
 // --- Socket.IO Connection Handling ---
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
 
     // --- Lobby Management Events ---
     socket.on('join_room', async ({ roomId, username, avatar, userId }) => {
-    console.log(`[join_room] Received userId: ${userId}`);
 
     if (!roomId || !username || !avatar) {
-        console.warn(`Invalid join_room attempt by ${socket.id}. Missing data.`);
+        console.warn(`Invalid join_room attempt by User. Missing data.`);
         socket.emit('join_room_error', { message: 'Missing room ID, username, or avatar.' });
         socket.emit("join_error", { error: "You're already in the room on another tab or from a recent session." });
         return;
@@ -132,7 +130,6 @@ io.on('connection', (socket) => {
 
     const dbRoom = await Room.findOne({ roomId });
     if (!dbRoom) {
-        console.log(`Room ${roomId} not found in DB for join attempt by ${username} (${socket.id}).`);
         socket.emit('join_room_error', { message: 'Room does not exist.' });
         return;
     }
@@ -151,17 +148,14 @@ io.on('connection', (socket) => {
             questionStartTime: 0
         };
         activeRooms.set(roomId, roomState);
-        console.log(`Initialized in-memory state for room: ${roomId}`);
     }
 
     if (roomState.players.size >= roomState.settings.maxPlayers) {
-        console.log(`Room ${roomId} is full. Join attempt by ${username} (${socket.id}) rejected.`);
         socket.emit('join_room_error', { message: 'Room is full.' });
         return;
     }
 
     if (roomState.status === 'playing') {
-        console.log(`Game in room ${roomId} is in progress. Join attempt by ${username} (${socket.id}) rejected.`);
         socket.emit('join_room_error', { message: 'Cannot join: game is already in progress.' });
         return;
     }
@@ -172,19 +166,16 @@ io.on('connection', (socket) => {
     const inGracePeriod = graceData && (Date.now() - graceData.timestamp < 2000);
 
     if (isUsernameTaken && !inGracePeriod) {
-        console.log(`Duplicate username "${username}" attempt in ${roomId} by ${socket.id}.`);
         socket.emit('join_room_error', { message: `Username "${username}" is already in this room.` });
         return;
     }
 
     if (inGracePeriod) {
         if (graceData.claimed) {
-            console.log(`Grace rejoin for ${username} already claimed. Rejecting new socket.`);
             socket.emit('join_room_error', { message: `Username "${username}" is already in this room.` });
             return;
         }
 
-        console.log(`Grace period active for ${username}, allowing rejoin.`);
         graceData.claimed = true;
         recentDisconnects.set(usernameKey, graceData);
     }
@@ -194,14 +185,10 @@ io.on('connection', (socket) => {
         if (!roomState.currentHostSocketId) {
             roomState.currentHostSocketId = socket.id;
             isHostForThisSession = true;
-            console.log(`Original host ${username} (${socket.id}) joined and set as live host for room ${roomId}.`);
-        } else {
-            console.log(`Original host ${username} (${socket.id}) joined, but ${roomState.players.get(roomState.currentHostSocketId)?.username} is already live host.`);
-        }
+        } 
     } else if (!roomState.currentHostSocketId && roomState.players.size === 0) {
         roomState.currentHostSocketId = socket.id;
         isHostForThisSession = true;
-        console.log(`First player ${username} (${socket.id}) joined and set as temporary live host for room ${roomId}.`);
     }
 
     roomState.players.set(socket.id, {
@@ -223,7 +210,6 @@ io.on('connection', (socket) => {
         }, 3000); // Add a small buffer after claiming
     }
 
-    console.log(`${username} (${socket.id}) joined Socket.IO room: ${roomId}. Current Live Host: ${roomState.players.get(roomState.currentHostSocketId)?.username || 'None'}`);
     const participants = Array.from(roomState.players.values());
     io.to(roomId).emit('update_lobby', {
         roomId: roomId,
@@ -258,9 +244,8 @@ io.on('connection', (socket) => {
             text,
             timestamp
         });
-        console.log(`Chat message in room ${roomId} from ${senderName}: ${text}`);
     } else {
-        console.warn(`User ${socket.id} tried to send message to unauthorized room ${roomId}`);
+        console.warn(`User tried to send message to unauthorized room ${roomId}`);
         socket.emit('notification', {
             type: 'error',
             message: 'You are not in this room.'
@@ -271,7 +256,6 @@ io.on('connection', (socket) => {
 
     // --- Disconnect Event ---
     socket.on('disconnect', async () => {
-        console.log(`User disconnected: ${socket.id}`);
 
         // Find which room the disconnected socket belonged to
         // We iterate through activeRooms because a socket might be in multiple rooms (though typically one for a quiz)
@@ -298,9 +282,8 @@ io.on('connection', (socket) => {
                         roomState.usernamesInRoom = new Set();
                     }
 
-                    console.log(`${disconnectedPlayer.username} (${socket.id}) left room: ${roomId}`);
                 } else {
-                    console.warn(`disconnect(): No username found for socket ${socket.id}`);
+                    console.warn("disconnect(): No username found for socket");
                 }
 
 
@@ -313,11 +296,9 @@ io.on('connection', (socket) => {
                         const newHostPlayer = roomState.players.get(newHostSocketId);
                         newHostPlayer.isHost = true; // Mark as host
                         roomState.currentHostSocketId = newHostSocketId;
-                        console.log(`Host ${disconnectedPlayer.username} disconnected. New host for room ${roomId}: ${newHostPlayer.username} (${newHostSocketId}).`);
                     } else {
                         // No players left, clear current host
                         roomState.currentHostSocketId = null;
-                        console.log(`Host ${disconnectedPlayer.username} disconnected. Room ${roomId} is now empty.`);
                     }
                 }
 
@@ -325,7 +306,6 @@ io.on('connection', (socket) => {
                 if (roomState.players.size === 0) {
                     activeRooms.delete(roomId);
                     // Remove from in-memory state
-                    console.log(`Room ${roomId} is now empty and removed from active state.`);
                     // Clear any game timer if it was running for this room
                     if (roomState.currentQuestionTimer) {
                         clearTimeout(roomState.currentQuestionTimer);
@@ -336,7 +316,6 @@ io.on('connection', (socket) => {
                     try {
                         await Room.deleteOne({ roomId: roomId });
                         // Await the deletion
-                        console.log(`Room ${roomId} (DB entry) deleted successfully.`);
                         // No need to emit update_lobby if room is empty
                     } catch (error) {
                         console.error(`Error deleting room ${roomId} from DB:`, error);
@@ -358,7 +337,6 @@ io.on('connection', (socket) => {
                     // If game was playing and host disconnected, consider pausing or ending if specific rules apply
                     // For now, it will continue with new host.
                     if (roomState.status === 'playing' && disconnectedPlayer.isHost && roomState.currentHostSocketId) {
-                        console.log(`Game in ${roomId} continues with new host.`);
                     }
                 }
                 break;
@@ -371,14 +349,14 @@ io.on('connection', (socket) => {
     // This is similar to disconnect but initiated by the client explicitly.
     socket.on('leave_room', async ({ roomId }) => {
         if (!roomId) {
-            console.warn(`Invalid leave_room attempt by ${socket.id}. Missing room ID.`);
+            console.warn(`Invalid leave_room attempt by User. Missing room ID.`);
             return;
         }
         roomId = roomId.toUpperCase();
         const roomState = activeRooms.get(roomId);
 
         if (!roomState || !roomState.players.has(socket.id)) {
-            console.warn(`Socket ${socket.id} tried to leave room ${roomId} but was not found in it.`);
+            console.warn(`User tried to leave room ${roomId} but was not found in it.`);
             return;
         }
 
@@ -388,8 +366,6 @@ io.on('connection', (socket) => {
         roomState.players.delete(socket.id);
         roomState.usernamesInRoom.delete(leavingPlayer.username.toLowerCase());
 
-        console.log(`${leavingPlayer.username} (${socket.id}) explicitly left room: ${roomId}`);
-
         // Host transfer logic
         if (socket.id === roomState.currentHostSocketId) {
             if (roomState.players.size > 0) {
@@ -397,15 +373,12 @@ io.on('connection', (socket) => {
                 const newHostPlayer = roomState.players.get(newHostSocketId);
                 newHostPlayer.isHost = true;
                 roomState.currentHostSocketId = newHostSocketId;
-                console.log(`Host ${leavingPlayer.username} left. New host for room ${roomId}: ${newHostPlayer.username} (${newHostSocketId}).`);
             } else {
                 roomState.currentHostSocketId = null;
-                console.log(`Host ${leavingPlayer.username} left. Room ${roomId} is now empty.`);
             }
         }
 
         if (roomState.players.size === 0) {
-            console.log(`Room ${roomId} is now completely empty after explicit leave. Terminating quiz session and cleaning up state.`);
             roomState.status = 'finished';
             if (roomState.currentQuestionTimer) {
                 clearTimeout(roomState.currentQuestionTimer);
@@ -413,7 +386,6 @@ io.on('connection', (socket) => {
             }
             io.to(roomId).emit('game_error', { message: 'Room became empty, quiz ended.' });
             activeRooms.delete(roomId);
-            console.log(`Room ${roomId} state deleted from activeRooms.`);
         } else {
             roomState.players.forEach(p => {
                 p.isHost = (p.socketId === roomState.currentHostSocketId);
@@ -436,7 +408,7 @@ io.on('connection', (socket) => {
         const player = roomState?.players.get(socket.id);
 
         if (!roomState || socket.id !== roomState.currentHostSocketId) {
-            console.warn(`Unauthorized attempt to update settings for room ${roomId} by ${socket.id}.`);
+            console.warn(`Unauthorized attempt to update settings for room ${roomId}.`);
             socket.emit('game_settings_error', { message: 'You are not authorized to change settings.' });
             return;
         }
@@ -460,7 +432,6 @@ io.on('connection', (socket) => {
 
         // Apply new settings
         roomState.settings = { ...roomState.settings, ...settings };
-        console.log(`Room ${roomId} settings updated by ${player.username}:`, roomState.settings);
 
         // Update settings in database for persistence
         try {
@@ -484,12 +455,11 @@ io.on('connection', (socket) => {
 
         // Validation: Check if room exists, sender is the current live host
         if (!roomState || !player || socket.id !== roomState.currentHostSocketId) {
-            console.warn(`Unauthorized attempt to delete room ${roomId} by ${socket.id}.`);
+            console.warn("Unauthorized attempt to delete room.");
             socket.emit('room_error', { message: 'You are not authorized to delete this room or room does not exist.' });
             return;
         }
 
-        console.log(`Host ${player.username} is initiating deletion of room: ${roomId}`);
 
         try {
             // Emit an event to all clients in the room that the
@@ -513,11 +483,9 @@ io.on('connection', (socket) => {
 
             // Remove from in-memory state
             activeRooms.delete(roomId);
-            console.log(`Room ${roomId} removed from active state.`);
 
             // Delete the room document from MongoDB
             await Room.deleteOne({ roomId: roomId });
-            console.log(`Room ${roomId} (DB entry) deleted successfully by host.`);
 
         } catch (error) {
             console.error(`Error deleting room ${roomId} by host:`, error);
@@ -556,7 +524,6 @@ io.on('connection', (socket) => {
             p.score = 0;
             p.answered = false;
         });
-        console.log(`Host ${player.username} starting game in room: ${roomId}`);
 
         try {
             // Fetch questions based on room settings
@@ -628,7 +595,6 @@ io.on('connection', (socket) => {
                 pointsEarned += POINTS_FOR_CORRECT_ANSWER * BONUS_FOR_FASTEST_ANSWER_PERCENT;
                 currentQuestion.firstCorrectAnswerSocketId = socket.id;
                 isFastest = true;
-                console.log(`${username} (${socket.id}) got fastest correct answer for Q${roomState.currentQuestionIndex + 1}! Bonus points awarded.`);
             }
 
             player.score += pointsEarned;
@@ -704,7 +670,6 @@ io.on('connection', (socket) => {
         // Crucial check: If room state no longer exists (e.g., all players disconnected)
         // or game is no longer playing, stop the function.
         if (!roomState || roomState.status !== 'playing') {
-            console.log(`sendNextQuestion aborted for room ${roomId}: room state missing or game not playing.`);
             return;
         }
 
@@ -732,11 +697,9 @@ io.on('connection', (socket) => {
                 timeLimit: roomState.settings.timePerQuestion,
                 questionStartTime: roomState.questionStartTime
             });
-            console.log(`Sent question ${roomState.currentQuestionIndex + 1}/${roomState.questions.length} to room ${roomId}: ${question.questionText}`);
 
             // Set a timer for the next question or game end
             roomState.currentQuestionTimer = setTimeout(() => {
-                console.log(`Time's up for question ${roomState.currentQuestionIndex + 1} in room ${roomId}. Correct Answer: ${question.correctAnswer}`);
                 // Inform clients about time's up and correct answer
                 io.to(roomId).emit('time_up', {
                     questionIndex: roomState.currentQuestionIndex,
@@ -751,7 +714,6 @@ io.on('connection', (socket) => {
         } else {
             // Game End Logic
             roomState.status = 'finished';
-            console.log(`Game ended in room ${roomId}. All questions answered.`);
 
             // Calculate final results and determine winner(s)
             const finalResults = Array.from(roomState.players.values()).map(player => ({
@@ -770,11 +732,9 @@ io.on('connection', (socket) => {
                 if (winners.some(w => w.username === player.username)) {
                     player.isWinner = true;
                     coins = 100 + Math.floor(player.score / 20); // Winner bonus + score-based
-                    console.log(`Winner! ${player.username} earned ${coins} coins.`);
                 } else {
                     coins = Math.floor(player.score / 10) + 10;
                     // Base 10 coins + score based
-                    console.log(`${player.username} earned ${coins} coins.`);
                 }
                 coinsEarnedMap.set(player.username, coins);
             }
@@ -801,12 +761,11 @@ io.on('connection', (socket) => {
                         await user.save();
                     }
                     } catch (err) {
-                    console.error(`Error updating totalGames for ${player.userId}:`, err);
+                    console.error("Error updating totalGames for user", err);
                     }
                 })
             );
 
-            console.log(`User coin balances updated in DB for room ${roomId}.`);
 
             // Save game results to DB
             try {
@@ -846,7 +805,6 @@ io.on('connection', (socket) => {
                 p.score = 0;
                 p.answered = false;
             });
-            console.log(`Room ${roomId} state reset to 'waiting' for a new game.`);
         }
     };
 });

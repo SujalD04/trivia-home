@@ -62,7 +62,6 @@ const fetchTriviaQuestions = async ({ amount = 10, category = 'any', difficulty 
             params.type = type;
         }
 
-        console.log('Fetching trivia questions with params:', params); // Log parameters for debugging
         const response = await axios.get(TRIVIA_API_BASE_URL, { params });
 
         if (response.data.response_code !== 0) {
@@ -110,9 +109,7 @@ const fetchTriviaQuestions = async ({ amount = 10, category = 'any', difficulty 
  */
 const fetchTriviaCategories = async () => {
     try {
-        console.log('Attempting to fetch categories from:', TRIVIA_CATEGORY_URL);
         const response = await axios.get(TRIVIA_CATEGORY_URL);
-        console.log('Categories API Response Status:', response.status);
 
         if (response.data && response.data.trivia_categories) {
             return response.data.trivia_categories.map(cat => ({
