@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
+import { useLocation } from 'react-router-dom';
+
 
 // Define available DiceBear avatar styles for dynamic generation
 const AVAILABLE_AVATAR_HEADS = [
@@ -25,6 +27,10 @@ function HomePage() {
   const [passwordInput, setPasswordInput] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [avatarHeadInput, setAvatarHeadInput] = useState(AVAILABLE_AVATAR_HEADS[0]); // Default to first avatar
+  const location = useLocation();
+  const notification = useGameStore((state) => state.notification);
+  const setNotification = useGameStore((state) => state.setNotification);
+
 
   const {
     isConnected,
@@ -33,7 +39,6 @@ function HomePage() {
     isLoading,
     joinRoom,
     createRoom,
-    setNotification,
     error,
     clearError,
   } = useGameStore();
@@ -79,6 +84,18 @@ function HomePage() {
       return () => clearTimeout(timer);
     }
   }, [error, setNotification, clearError]);
+
+
+  useEffect(() => {
+    if (location.state?.kickedMessage) {
+      setNotification({ type: 'error', message: location.state.kickedMessage });
+
+      // Remove kickedMessage from history so it doesn't repeat on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, setNotification]);
+
+
 
   // --- Validation Helper ---
   const validateInputs = useCallback(() => {
@@ -210,17 +227,17 @@ function HomePage() {
         aria-hidden="true"
       ></div>
 
-      {/* --- Global Notification Area --- */}
-      {/* {useGameStore.getState().notification && (
+      {notification && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 p-3 sm:p-4 rounded-lg shadow-lg text-center z-50 animate-slide-down-fade ${
-          useGameStore.getState().notification.type === 'success' ? 'bg-green-600' :
-          useGameStore.getState().notification.type === 'error' ? 'bg-red-600' :
-          useGameStore.getState().notification.type === 'info' ? 'bg-blue-600' :
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' :
+          notification.type === 'info' ? 'bg-blue-600' :
           'bg-gray-600'
         } text-white font-semibold transform transition-all duration-300`}>
-          {useGameStore.getState().notification.message}
+          {notification.message}
         </div>
-      )} */}
+      )}
+
 
       {/* --- Main Content Container (now takes full width, with max-width for content inside) --- */}
       <div className="relative z-10 bg-gray-800 bg-opacity-90 backdrop-filter backdrop-blur-sm rounded-2xl shadow-neo-brutalism p-6 sm:p-8 md:p-10 lg:p-12 w-full max-w-6xl mx-auto animate-fade-in border-4 border-gray-700">

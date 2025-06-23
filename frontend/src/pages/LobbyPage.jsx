@@ -155,6 +155,11 @@ function LobbyPage() {
         setSelectedDifficulty(e.target.value);
     };
 
+    const handleKickPlayer = (targetSocketId) => {
+    if (!isHost || !roomId) return;
+    socket.emit("kick-player", { roomId, targetId: targetSocketId });
+    };
+
 
     // Handle game settings submission
     const handleUpdateSettings = async (e) => {
@@ -227,6 +232,36 @@ function LobbyPage() {
         await startGame(); // Call the store action
         // isStartingGame will be reset by the useEffect when roomStatus changes to 'playing'
     };
+
+    useEffect(() => {
+    if (!socket) return;
+
+    const handleKicked = ({ message }) => {
+        // 1. Clean session
+        localStorage.removeItem('roomId');
+        localStorage.removeItem('myUsername');
+        localStorage.removeItem('myAvatar');
+        localStorage.removeItem('socketId');
+
+        // 2. Clear Zustand game state
+        useGameStore.getState().leaveRoom();
+
+        // 3. Queue a custom notification to be shown on reconnect
+        useGameStore.getState().set({
+        nextNotification: { type: 'error', message: message || 'You were kicked from the room.' },
+        });
+
+        // 4. Navigate to homepage (don't pass state, we now use Zustand)
+        navigate('/');
+    };
+
+    socket.on("kicked", handleKicked);
+
+    return () => {
+        socket.off("kicked", handleKicked);
+    };
+    }, [socket, navigate]);
+
 
     // Handle leave room via confirmation modal
     const handleLeaveRoom = () => {
@@ -504,7 +539,20 @@ function LobbyPage() {
                                             {p.socketId === socketId && <span className="text-blue-200 font-normal ml-2">(You)</span>}
                                         </span>
                                     </div>
-                                    {p.isHost && <span className="bg-yellow-500 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-host-glow">HOST</span>}
+                                    <div className="flex items-center space-x-2">
+                                {p.isHost && (
+                                    <span className="bg-yellow-500 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-host-glow">HOST</span>
+                                )}
+                                {isHost && p.socketId !== socketId && (
+                                    <button
+                                    onClick={() => handleKickPlayer(p.socketId)}
+                                    className="text-red-400 hover:text-red-600 transition text-xl"
+                                    title={`Kick ${p.username}`}
+                                    >
+                                    ❌
+                                    </button>
+                                )}
+                                </div>
                                 </li>
                             ))}
                         </ul>

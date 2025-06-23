@@ -29,8 +29,6 @@ function LiveChat({ hidden }) {
     return `https://api.dicebear.com/8.x/${avatarStyle}/svg?seed=${avatarSeed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf,ffd5dc,a6e3d9&radius=50`;
   };
 
-  console.log("socket:", socket);
-  console.log("roomId:", roomId);
 
   // Scroll to bottom of chat on new messages
   useEffect(() => {

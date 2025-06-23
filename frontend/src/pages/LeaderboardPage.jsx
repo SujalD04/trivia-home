@@ -229,7 +229,7 @@ const LeaderboardPage = () => {
                   <tr className="border-b border-gray-500 text-gray-300 uppercase text-sm">
                     <th className="py-3 px-4 rounded-tl-lg">Rank</th>
                     <th className="py-3 px-4">Player ID</th>
-                    <th className="py-3 px-4 text-center">Correct</th> {/* Renamed */}
+                    <th className="py-3 px-4 text-center">Correct</th>
                     <th className="py-3 px-4 text-center">Games</th>
                     <th className="py-3 px-4 text-center hidden sm:table-cell">Questions</th>
                     <th className="py-3 px-4 text-center rounded-tr-lg hidden md:table-cell">Fastest Time</th>
@@ -255,11 +255,16 @@ const LeaderboardPage = () => {
                         {index >= 3 && index + 1}
                       </td>
                       <td className="py-3 px-4 font-mono text-sm sm:text-base">
-                        <code className={`${player.userId === userId ? 'text-white' : 'text-blue-300'}`}>
-                          {player.userId}
-                        </code>
+                        <div className="flex flex-col leading-tight">
+                          <code className={`${player.userId === userId ? 'text-white' : 'text-blue-300'}`}>
+                            {player.userId}
+                          </code>
+                          <span className="text-xs text-gray-400 font-sans mt-1 break-words">
+                            {player.username || 'Unknown'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-3 px-4 text-center text-lg font-semibold">{player.totalWins}</td> {/* This is now Correct Answers */}
+                      <td className="py-3 px-4 text-center text-lg font-semibold">{player.totalWins}</td>
                       <td className="py-3 px-4 text-center text-lg font-semibold">{player.totalGames}</td>
                       <td className="py-3 px-4 text-center text-lg hidden sm:table-cell">{player.totalQuestions}</td>
                       <td className="py-3 px-4 text-center text-lg hidden md:table-cell">

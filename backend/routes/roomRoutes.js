@@ -42,7 +42,7 @@ router.post('/create', async (req, res) => {
         // Hash password
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
-        const trimmedUsername = username.trim();
+        const trimmedUsername = username.trim().toLowerCase();
         if (trimmedUsername.length > 26) {
             return res.status(400).json({ message: 'Username cannot exceed 26 characters.' });
         }
@@ -53,17 +53,21 @@ router.post('/create', async (req, res) => {
 
 
         // Ensure the host user exists or create them (basic user creation if not existing)
-        let user = await User.findOne({ username: trimmedUsername.toLowerCase() });
+        let user = await User.findById(req.body.userId);
         if (!user) {
-            user = new User({ username: trimmedUsername.toLowerCase() });
-            await user.save();
+        user = new User({
+            _id: req.body.userId,
+            username: trimmedUsername,
+        });
+        await user.save();
         }
+
 
 
         const newRoom = new Room({
             roomId: roomName.toUpperCase(), // Using roomName as roomId, converted to uppercase
             passwordHash,
-            hostId: user.username // Store the username of the host
+            hostId: trimmedUsername // Store the username of the host
         });
 
         await newRoom.save();
@@ -71,7 +75,7 @@ router.post('/create', async (req, res) => {
             message: 'Room created successfully!',
             roomId: newRoom.roomId,
             settings: newRoom.settings,
-            hostId: newRoom.hostId
+            hostId: trimmedUsername
         });
 
     } catch (err) {
@@ -105,7 +109,7 @@ router.post('/join', async (req, res) => {
             return res.status(401).json({ message: 'Incorrect password.' });
         }
 
-        const trimmedUsername = username.trim();
+        const trimmedUsername = username.trim().toLowerCase();
         if (trimmedUsername.length > 26) {
             return res.status(400).json({ message: 'Username cannot exceed 26 characters.' });
         }
@@ -115,11 +119,16 @@ router.post('/join', async (req, res) => {
 
 
         // Ensure the joining user exists or create them (basic user creation if not existing)
-        let user = await User.findOne({ username: trimmedUsername.toLowerCase() });
+        let user = await User.findById(req.body.userId);
+
         if (!user) {
-            user = new User({ username: trimmedUsername.toLowerCase() });
-            await user.save();
+        user = new User({
+            _id: req.body.userId,                    // ✅ This MUST be a UUID string
+            username: trimmedUsername,
+        });
+        await user.save();
         }
+
 
 
         // Check if room is full
@@ -133,7 +142,7 @@ router.post('/join', async (req, res) => {
             message: 'Successfully joined room!',
             roomId: room.roomId,
             settings: room.settings,
-            hostId: room.hostId
+            hostId: trimmedUsername
         });
 
     } catch (err) {

@@ -559,6 +559,61 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on("kick-player", async ({ roomId, targetId }) => {
+        roomId = roomId.toUpperCase();
+        const roomState = activeRooms.get(roomId);
+
+        // Validation
+        if (!roomState || socket.id !== roomState.currentHostSocketId) {
+            socket.emit("notification", { type: "error", message: "Only the host can kick players." });
+            return;
+        }
+
+        if (!roomState.players.has(targetId)) {
+            socket.emit("notification", { type: "error", message: "Player not found in room." });
+            return;
+        }
+
+        const kickedPlayer = roomState.players.get(targetId);
+        const usernameKey = kickedPlayer.username.toLowerCase();
+
+        // Cleanup in memory
+        roomState.players.delete(targetId);
+        roomState.usernamesInRoom.delete(usernameKey);
+
+        // Remove from Socket.IO room
+        const targetSocket = io.sockets.sockets.get(targetId);
+        if (targetSocket) {
+            targetSocket.leave(roomId);
+            targetSocket.emit("kicked", { message: "You have been removed by the host." });
+        }
+
+        // Reassign host if they somehow kicked themselves (shouldn’t happen but safe)
+        if (targetId === roomState.currentHostSocketId) {
+            if (roomState.players.size > 0) {
+                const newHostSocketId = roomState.players.keys().next().value;
+                const newHost = roomState.players.get(newHostSocketId);
+                newHost.isHost = true;
+                roomState.currentHostSocketId = newHostSocketId;
+            } else {
+                roomState.currentHostSocketId = null;
+            }
+        }
+
+        // Update lobby participants
+        const participants = Array.from(roomState.players.values());
+        io.to(roomId).emit("update_lobby", {
+            roomId,
+            participants,
+            settings: roomState.settings,
+            status: roomState.status,
+            hostUsername: roomState.players.get(roomState.currentHostSocketId)?.username || roomState.hostUsername
+        });
+
+        console.log(`[KICK] Player ${kickedPlayer.username} was kicked from room ${roomId}`);
+    });
+
+
     // --- Answer Submission Event ---
     socket.on('submit_answer', async ({ roomId, username, answer, userId }) => {
         roomId = roomId.toUpperCase();

@@ -54,6 +54,8 @@ const initialState = {
     isLoading: true, // Indicates a significant operation (connection, join) is in progress
     error: null, // { type: 'join'|'game'|'room'|'connect'|'settings', message: '...' }
     notification: null, // { type: 'success'|'error'|'info'|'warning', message: '...' }
+    nextNotification: null, // Used to show a special message after socket reconnect
+
 };
 
 const { userId } = useUserStore.getState();
@@ -153,7 +155,14 @@ export const useGameStore = create((set, get) => ({
             rejoinEmitted = true;
 
             set({ socket: newSocket, isConnected: true, socketId: newSocket.id, isLoading: false });
+            const customNotice = get().nextNotification;
+            if (customNotice) {
+            get().setNotification(customNotice);
+            set({ nextNotification: null }); // Reset after using
+            } else {
             get().setNotification({ type: 'success', message: 'Connected to game server!' });
+            }
+
             localStorage.setItem('socketId', newSocket.id);
 
             const storedRoomId = localStorage.getItem('roomId');
@@ -533,7 +542,7 @@ export const useGameStore = create((set, get) => ({
             const apiResponse = await fetch(`${API_BASE_URL}/rooms/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomName: roomNameInput, password: passwordInput, username: usernameInput })
+                body: JSON.stringify({ roomName: roomNameInput, password: passwordInput, username: usernameInput, userId: useUserStore.getState().userId })
             });
 
             const apiData = await apiResponse.json();
@@ -547,6 +556,7 @@ export const useGameStore = create((set, get) => ({
 
             // API create successful, now emit socket event
             const { socket } = get();
+            const userId = useUserStore.getState().userId;
             if (socket && socket.connected) {
                 socket.emit('join_room', {
                     roomId: apiData.roomId,
