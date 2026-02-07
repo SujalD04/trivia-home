@@ -37,7 +37,7 @@ router.put('/:userId', async (req, res) => {
   try {
     const { userId } = req.params; // Extract userId from URL parameters
     // Destructure the expected settings fields from the request body
-    const { soundEnabled, notificationsEnabled, theme, fastMode } = req.body;
+    const { soundEnabled, notificationsEnabled, theme, fastMode, musicVolume, preferredLanguage } = req.body;
 
     // Use findOneAndUpdate to find a document by userId and update it.
     // If no document is found, `upsert: true` will create a new one.
@@ -45,7 +45,7 @@ router.put('/:userId', async (req, res) => {
     // `runValidators: true` ensures that schema validators are run on the update.
     const updatedSettings = await UserSetting.findOneAndUpdate(
       { userId: userId }, // Query: find by userId
-      { soundEnabled, notificationsEnabled, theme, fastMode }, // Update fields
+      { soundEnabled, notificationsEnabled, theme, fastMode, musicVolume, preferredLanguage }, // Update fields
       { new: true, upsert: true, runValidators: true } // Options
     );
 
@@ -56,5 +56,6 @@ router.put('/:userId', async (req, res) => {
     res.status(500).json({ message: 'Server error while updating settings.' });
   }
 });
+
 
 module.exports = router;

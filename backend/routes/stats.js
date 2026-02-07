@@ -5,9 +5,11 @@ const User = require('../models/User');
 
 const router = express.Router();
 
+// Get stats for a specific user by userId (which is stored as _id in UserStats)
 router.get('/:userId', async (req, res) => {
   try {
-    const stats = await UserStats.findOne({ userId: req.params.userId });
+    // UserStats uses _id as the userId
+    const stats = await UserStats.findById(req.params.userId);
     if (!stats) {
       return res.status(404).json({ error: 'Stats not found' });
     }
@@ -25,10 +27,10 @@ router.get('/global/top', async (req, res) => {
       { $limit: 25 },
       {
         $lookup: {
-            from: "users",
-            localField: "userId",
-            foreignField: "_id",
-            as: "userDetails"
+          from: "users",
+          localField: "_id",  // UserStats._id is the userId
+          foreignField: "_id", // User._id is also the userId
+          as: "userDetails"
         }
 
       },
@@ -40,7 +42,7 @@ router.get('/global/top', async (req, res) => {
       },
       {
         $project: {
-          userId: 1,
+          _id: 1,
           totalGames: 1,
           totalWins: 1,
           totalLosses: 1,
@@ -51,7 +53,7 @@ router.get('/global/top', async (req, res) => {
         }
       }
     ]);
-    
+
     res.json(topUsers);
   } catch (err) {
     console.error('Error fetching global leaderboard:', err);

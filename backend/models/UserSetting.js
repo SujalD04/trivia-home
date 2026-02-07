@@ -14,6 +14,12 @@ const UserSettingSchema = new mongoose.Schema({
     type: Boolean,
     default: true, // Default value if not provided
   },
+  musicVolume: {
+    type: Number,
+    default: 0.3, // Default volume 30%
+    min: 0,
+    max: 1,
+  },
   notificationsEnabled: {
     type: Boolean,
     default: true, // Default value
@@ -39,3 +45,4 @@ const UserSettingSchema = new mongoose.Schema({
 const UserSetting = mongoose.model('UserSetting', UserSettingSchema);
 
 module.exports = UserSetting;
+

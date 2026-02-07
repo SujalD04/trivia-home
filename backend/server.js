@@ -42,7 +42,29 @@ app.use('/api/settings', settingsRoutes);
 
 // --- Database Connection ---
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('MongoDB connected successfully'))
+    .then(async () => {
+        console.log('MongoDB connected successfully');
+
+        // Clean up old conflicting index from userstats collection
+        try {
+            const db = mongoose.connection.db;
+            const collection = db.collection('userstats');
+
+            // Check if the old userId_1 index exists and drop it
+            const indexes = await collection.indexes();
+            const hasOldIndex = indexes.some(idx => idx.name === 'userId_1');
+
+            if (hasOldIndex) {
+                await collection.dropIndex('userId_1');
+                console.log('Dropped old userId_1 index from userstats collection');
+            }
+        } catch (err) {
+            // Index might not exist, that's fine
+            if (err.code !== 27) { // 27 = IndexNotFound
+                console.log('Note: Could not drop userId_1 index (may not exist):', err.message);
+            }
+        }
+    })
     .catch(err => console.error('MongoDB connection error:', err));
 
 // --- Live Game/Lobby State (In-Memory) ---
@@ -118,140 +140,140 @@ io.on('connection', (socket) => {
     // --- Lobby Management Events ---
     socket.on('join_room', async ({ roomId, username, avatar, userId }) => {
 
-    if (!roomId || !username || !avatar) {
-        console.warn(`Invalid join_room attempt by User. Missing data.`);
-        socket.emit('join_room_error', { message: 'Missing room ID, username, or avatar.' });
-        socket.emit("join_error", { error: "You're already in the room on another tab or from a recent session." });
-        return;
-    }
+        if (!roomId || !username || !avatar) {
+            console.warn(`Invalid join_room attempt by User. Missing data.`);
+            socket.emit('join_room_error', { message: 'Missing room ID, username, or avatar.' });
+            socket.emit("join_error", { error: "You're already in the room on another tab or from a recent session." });
+            return;
+        }
 
-    roomId = roomId.toUpperCase();
-    let roomState = activeRooms.get(roomId);
+        roomId = roomId.toUpperCase();
+        let roomState = activeRooms.get(roomId);
 
-    const dbRoom = await Room.findOne({ roomId });
-    if (!dbRoom) {
-        socket.emit('join_room_error', { message: 'Room does not exist.' });
-        return;
-    }
+        const dbRoom = await Room.findOne({ roomId });
+        if (!dbRoom) {
+            socket.emit('join_room_error', { message: 'Room does not exist.' });
+            return;
+        }
 
-    if (!roomState) {
-        roomState = {
-            hostUsername: dbRoom.hostId,
-            currentHostSocketId: null,
-            settings: dbRoom.settings,
-            players: new Map(),
-            usernamesInRoom: new Set(),
-            status: 'waiting',
-            currentQuestionIndex: 0,
-            questions: [],
-            currentQuestionTimer: null,
-            questionStartTime: 0
-        };
-        activeRooms.set(roomId, roomState);
-    }
+        if (!roomState) {
+            roomState = {
+                hostUsername: dbRoom.hostId,
+                currentHostSocketId: null,
+                settings: dbRoom.settings,
+                players: new Map(),
+                usernamesInRoom: new Set(),
+                status: 'waiting',
+                currentQuestionIndex: 0,
+                questions: [],
+                currentQuestionTimer: null,
+                questionStartTime: 0
+            };
+            activeRooms.set(roomId, roomState);
+        }
 
-    if (roomState.players.size >= roomState.settings.maxPlayers) {
-        socket.emit('join_room_error', { message: 'Room is full.' });
-        return;
-    }
+        if (roomState.players.size >= roomState.settings.maxPlayers) {
+            socket.emit('join_room_error', { message: 'Room is full.' });
+            return;
+        }
 
-    if (roomState.status === 'playing') {
-        socket.emit('join_room_error', { message: 'Cannot join: game is already in progress.' });
-        return;
-    }
+        if (roomState.status === 'playing') {
+            socket.emit('join_room_error', { message: 'Cannot join: game is already in progress.' });
+            return;
+        }
 
-    const usernameKey = username.toLowerCase();
-    const isUsernameTaken = roomState.usernamesInRoom.has(usernameKey);
-    const graceData = recentDisconnects.get(usernameKey);
-    const inGracePeriod = graceData && (Date.now() - graceData.timestamp < 2000);
+        const usernameKey = username.toLowerCase();
+        const isUsernameTaken = roomState.usernamesInRoom.has(usernameKey);
+        const graceData = recentDisconnects.get(usernameKey);
+        const inGracePeriod = graceData && (Date.now() - graceData.timestamp < 2000);
 
-    if (isUsernameTaken && !inGracePeriod) {
-        socket.emit('join_room_error', { message: `Username "${username}" is already in this room.` });
-        return;
-    }
-
-    if (inGracePeriod) {
-        if (graceData.claimed) {
+        if (isUsernameTaken && !inGracePeriod) {
             socket.emit('join_room_error', { message: `Username "${username}" is already in this room.` });
             return;
         }
 
-        graceData.claimed = true;
-        recentDisconnects.set(usernameKey, graceData);
-    }
+        if (inGracePeriod) {
+            if (graceData.claimed) {
+                socket.emit('join_room_error', { message: `Username "${username}" is already in this room.` });
+                return;
+            }
 
-    let isHostForThisSession = false;
-    if (username === roomState.hostUsername) {
-        if (!roomState.currentHostSocketId) {
+            graceData.claimed = true;
+            recentDisconnects.set(usernameKey, graceData);
+        }
+
+        let isHostForThisSession = false;
+        if (username === roomState.hostUsername) {
+            if (!roomState.currentHostSocketId) {
+                roomState.currentHostSocketId = socket.id;
+                isHostForThisSession = true;
+            }
+        } else if (!roomState.currentHostSocketId && roomState.players.size === 0) {
             roomState.currentHostSocketId = socket.id;
             isHostForThisSession = true;
-        } 
-    } else if (!roomState.currentHostSocketId && roomState.players.size === 0) {
-        roomState.currentHostSocketId = socket.id;
-        isHostForThisSession = true;
-    }
+        }
 
-    roomState.players.set(socket.id, {
-        socketId: socket.id,
-        username,
-        avatar,
-        score: 0,
-        isHost: isHostForThisSession || (socket.id === roomState.currentHostSocketId),
-        answered: false,
-        userId
+        roomState.players.set(socket.id, {
+            socketId: socket.id,
+            username,
+            avatar,
+            score: 0,
+            isHost: isHostForThisSession || (socket.id === roomState.currentHostSocketId),
+            answered: false,
+            userId
+        });
+        roomState.usernamesInRoom.add(usernameKey);
+        socket.join(roomId);
+
+        // Optional: Cleanup grace period entry a few seconds later
+        if (inGracePeriod) {
+            setTimeout(() => {
+                recentDisconnects.delete(usernameKey);
+            }, 3000); // Add a small buffer after claiming
+        }
+
+        const participants = Array.from(roomState.players.values());
+        io.to(roomId).emit('update_lobby', {
+            roomId: roomId,
+            participants: participants,
+            settings: roomState.settings,
+            status: roomState.status,
+            hostUsername: roomState.players.get(roomState.currentHostSocketId)?.username || roomState.hostUsername
+        });
     });
-    roomState.usernamesInRoom.add(usernameKey);
-    socket.join(roomId);
-
-    // Optional: Cleanup grace period entry a few seconds later
-    if (inGracePeriod) {
-        setTimeout(() => {
-            recentDisconnects.delete(usernameKey);
-        }, 3000); // Add a small buffer after claiming
-    }
-
-    const participants = Array.from(roomState.players.values());
-    io.to(roomId).emit('update_lobby', {
-        roomId: roomId,
-        participants: participants,
-        settings: roomState.settings,
-        status: roomState.status,
-        hostUsername: roomState.players.get(roomState.currentHostSocketId)?.username || roomState.hostUsername
-    });
-});
 
     //Live Chat
     socket.on('chatMessage', (data) => {
-    let { roomId, senderId, senderName, senderAvatar, text, timestamp } = data;
+        let { roomId, senderId, senderName, senderAvatar, text, timestamp } = data;
 
-    // Enforce max message length
-    text = text.trim();
-    if (text.length === 0) return; // Ignore empty messages
-    if (text.length > 300) {
-        return socket.emit('notification', {
-            type: 'error',
-            message: 'Chat messages cannot exceed 300 characters.'
-        });
-    }
+        // Enforce max message length
+        text = text.trim();
+        if (text.length === 0) return; // Ignore empty messages
+        if (text.length > 300) {
+            return socket.emit('notification', {
+                type: 'error',
+                message: 'Chat messages cannot exceed 300 characters.'
+            });
+        }
 
-    // Ensure the user is actually in the room
-    const room = io.sockets.adapter.rooms.get(roomId);
-    if (room && room.has(socket.id)) {
-        io.to(roomId).emit('chatMessage', {
-            senderId,
-            senderName,
-            senderAvatar,
-            text,
-            timestamp
-        });
-    } else {
-        console.warn(`User tried to send message to unauthorized room ${roomId}`);
-        socket.emit('notification', {
-            type: 'error',
-            message: 'You are not in this room.'
-        });
-    }
-});
+        // Ensure the user is actually in the room
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (room && room.has(socket.id)) {
+            io.to(roomId).emit('chatMessage', {
+                senderId,
+                senderName,
+                senderAvatar,
+                text,
+                timestamp
+            });
+        } else {
+            console.warn(`User tried to send message to unauthorized room ${roomId}`);
+            socket.emit('notification', {
+                type: 'error',
+                message: 'You are not in this room.'
+            });
+        }
+    });
 
 
     // --- Disconnect Event ---
@@ -386,6 +408,14 @@ io.on('connection', (socket) => {
             }
             io.to(roomId).emit('game_error', { message: 'Room became empty, quiz ended.' });
             activeRooms.delete(roomId);
+
+            // Delete the room document from MongoDB when empty
+            try {
+                await Room.deleteOne({ roomId: roomId });
+                console.log(`Room ${roomId} deleted from DB (last player left).`);
+            } catch (error) {
+                console.error(`Error deleting room ${roomId} from DB:`, error);
+            }
         } else {
             roomState.players.forEach(p => {
                 p.isHost = (p.socketId === roomState.currentHostSocketId);
@@ -689,31 +719,61 @@ io.on('connection', (socket) => {
         // ✅ Save stats to DB using userId
         if (userId) {
             try {
-                const UserStats = await import('./models/UserStats.js').then(m => m.default); // ESM-style
-                let user = await UserStats.findOne({ userId });
-                if (!user) {
-                    user = await UserStats.create({ userId });
-                }
-
-                user.totalQuestions += 1;
-                if (isCorrect) {
-                    user.totalWins += 1;
-                } else {
-                    user.totalLosses += 1;
-                }
+                const UserStats = await import('./models/UserStats.js').then(m => m.default);
 
                 const now = Date.now();
-                const startTime = player.questionStartTime || now; // fallback in case
+                const startTime = player.questionStartTime || now;
                 const answerTime = (now - startTime) / 1000; // in seconds
 
-                if (!user.fastestAnswerTime || answerTime < user.fastestAnswerTime) {
-                    user.fastestAnswerTime = answerTime;
-                }
+                // Use findOneAndUpdate with upsert to avoid duplicate key errors
+                const updateData = {
+                    $inc: {
+                        totalQuestions: 1,
+                        totalWins: isCorrect ? 1 : 0,
+                        totalLosses: isCorrect ? 0 : 1
+                    }
+                };
 
-                await user.save();
+                // First, update or create the document
+                await UserStats.findOneAndUpdate(
+                    { _id: userId },
+                    updateData,
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+
+                // Then, update fastest answer time if this is faster
+                if (isCorrect) {
+                    await UserStats.findOneAndUpdate(
+                        { _id: userId, $or: [{ fastestAnswerTime: null }, { fastestAnswerTime: { $gt: answerTime } }] },
+                        { $set: { fastestAnswerTime: answerTime } }
+                    );
+                }
             } catch (err) {
                 console.error("Error updating user stats:", err);
             }
+        }
+
+
+        // ✅ Check if ALL players have answered - skip timer early
+        const allAnswered = Array.from(roomState.players.values()).every(p => p.answered);
+        if (allAnswered && roomState.status === 'playing') {
+            // Clear the current question timer
+            if (roomState.currentQuestionTimer) {
+                clearTimeout(roomState.currentQuestionTimer);
+                roomState.currentQuestionTimer = null;
+            }
+
+            // Emit time_up with correct answer
+            io.to(roomId).emit('time_up', {
+                questionIndex: roomState.currentQuestionIndex,
+                correctAnswer: currentQuestion.correctAnswer
+            });
+
+            // Short delay before moving to next question for UX
+            setTimeout(() => {
+                roomState.currentQuestionIndex++;
+                sendNextQuestion(roomId);
+            }, 1500); // 1.5 second delay to show correct answer
         }
     });
 
@@ -809,14 +869,15 @@ io.on('connection', (socket) => {
                     if (!player.userId) return;
 
                     try {
-                    const UserStats = await import('./models/UserStats.js').then(m => m.default);
-                    const user = await UserStats.findOne({ userId: player.userId });
-                    if (user) {
-                        user.totalGames += 1;
-                        await user.save();
-                    }
+                        const UserStats = await import('./models/UserStats.js').then(m => m.default);
+                        // Use findOneAndUpdate with $inc to atomically increment totalGames
+                        await UserStats.findOneAndUpdate(
+                            { _id: player.userId },
+                            { $inc: { totalGames: 1 } },
+                            { upsert: true, new: true, setDefaultsOnInsert: true }
+                        );
                     } catch (err) {
-                    console.error("Error updating totalGames for user", err);
+                        console.error("Error updating totalGames for user", err);
                     }
                 })
             );
@@ -859,6 +920,16 @@ io.on('connection', (socket) => {
             roomState.players.forEach(p => { // Reset scores and answered status for next game
                 p.score = 0;
                 p.answered = false;
+            });
+
+            // Emit update_lobby after game ends so clients get refreshed host status and room status
+            const participants = Array.from(roomState.players.values());
+            io.to(roomId).emit('update_lobby', {
+                roomId: roomId,
+                participants: participants,
+                settings: roomState.settings,
+                status: roomState.status, // Now 'waiting'
+                hostUsername: roomState.players.get(roomState.currentHostSocketId)?.username || roomState.hostUsername
             });
         }
     };
